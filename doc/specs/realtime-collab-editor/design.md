@@ -7,7 +7,7 @@ A monorepo with two apps:
 ```
 /client   React + Vite + TypeScript + Tailwind. Monaco editor, Yjs sync, presence,
           chat, run panel, theme, name gate.
-/server   Express + ws (y-websocket protocol) + Socket.IO + /api/execute Piston proxy.
+/server   Express + ws (y-websocket protocol) + Socket.IO + /api/execute Judge0 / Piston proxy.
 ```
 
 The source of truth for the document is a **Yjs document** per room, synchronized over a
@@ -26,8 +26,8 @@ synced and survive reconnects along with the document.
   conflict-free, reconnect-intact requirements with minimal custom code.
 - **Socket.IO** handles ephemeral room events (chat, toasts, shared output) with rooms
   and auto-reconnect out of the box.
-- **Piston via a backend proxy** keeps the public API behind our server (CORS, timeout,
-  rate-limit, hiding the upstream), satisfying the execute requirement.
+- **Judge0 CE via a backend proxy** keeps the public API behind our server (CORS, timeout,
+  rate-limit, hiding the upstream), satisfying the execute requirement. Piston is supported as a secondary engine.
 
 ## Architecture
 
@@ -35,24 +35,24 @@ synced and survive reconnects along with the document.
 ┌──────────────── client (Vite) ────────────────┐        ┌──────── server (Node) ────────┐
 │  ThemeProvider ─ TopBar ─ Sidebar ─ EditorPane │        │  Express                       │
 │                         │                       │ WS     │   ├─ GET  /health             │
-│                 Monaco  ├── y-monaco ──Y.Doc────┼───────▶│   └─ POST /api/execute (Piston)│
+│                 Monaco  ├── y-monaco ──Y.Doc────┼───────▶│   └─ POST /api/execute (Judge0)│
 │                         │   Awareness           │        │  ws server (y-websocket proto) │
 │  OutputPanel ─ Input ─ Chat ─ Toasts            │ IO     │  Socket.IO (chat/room events)  │
-│                         └── socket.io-client ───┼───────▶│                                │
+│                         └── socket.io-client ───┼───────▶│  Static client server (/dist)  │
 └────────────────────────────────────────────────┘        └────────────────────────────────┘
 ```
 
 ### Server
 
-- `src/index.ts` — boots Express + HTTP server, mounts Socket.IO and the ws upgrade.
+- `src/index.ts` — boots Express + HTTP server, mounts Socket.IO and the ws upgrade, serves static client build from `client/dist`.
 - `src/yjs.ts` — y-websocket connection handling (`setupWSConnection`), optional
   `y-leveldb` persistence behind an env flag.
 - `src/socket.ts` — Socket.IO namespace: room join/leave, chat relay, presence names for
   duplicate-name validation, shared output broadcast, toast events.
 - `src/execute.ts` — `/api/execute` handler: validates body, maps our language id →
-  Piston runtime, POSTs to Piston with a 10s timeout (AbortController), normalizes the
+  Judge0 runtime ID (or Piston runtime), POSTs to Judge0 with a 10s timeout (AbortController), normalizes the
   response to `{ stdout, stderr, code, time, error? }`.
-- `src/languages.ts` — shared language registry (id, label, monaco id, piston language +
+- `src/languages.ts` — shared language registry (id, label, monaco id, judge0Id, piston language +
   version, file extension, Hello-World template). Mirrored on the client.
 
 Duplicate-name check: the client asks the server (Socket.IO ack) whether a name is free
