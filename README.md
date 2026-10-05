@@ -5,7 +5,7 @@ and edit the same document in real time with conflict-free merging (CRDT), see e
 other's cursors and presence, chat, and run code in many languages.
 
 > **Live sync** powered by **Yjs** over WebSocket · **Monaco** editor · **Socket.IO** for
-> chat/presence · code execution via the **Piston** API behind a backend proxy.
+> chat/presence · code execution via **Judge0 CE** (and **Piston**) behind a backend proxy.
 
 ---
 
@@ -35,8 +35,8 @@ other's cursors and presence, chat, and run code in many languages.
 ## Supported languages
 
 C++, C, Python, Java, JavaScript, TypeScript, Go, Rust, C#, PHP, Ruby, Kotlin, SQL — each
-with syntax highlighting, a "Hello World" starter, the right file extension, and a Piston
-runtime for execution.
+with syntax highlighting, a "Hello World" starter, the right file extension, and Judge0 / Piston
+runtimes for execution.
 
 ---
 
@@ -49,10 +49,11 @@ runtime for execution.
 | Realtime    | Yjs + `y-websocket` + `y-monaco` (+ Awareness for presence)   |
 | Chat/events | Socket.IO                                                     |
 | Server      | Node.js + Express + `ws` (y-websocket protocol) + Socket.IO   |
-| Execution   | Piston API via `POST /api/execute` proxy                      |
+| Execution   | Judge0 CE (default) / Piston API via `POST /api/execute` proxy|
+| Deployment  | Single-port Express static server / Docker / Render           |
 | Tests       | Vitest (name validation + theme logic)                        |
 
-No database — room state lives in memory. Optional disk persistence via `y-leveldb`
+No database required — room state lives in memory. Optional disk persistence via `y-leveldb`
 (set `PERSIST=1`).
 
 ---
@@ -61,7 +62,7 @@ No database — room state lives in memory. Optional disk persistence via `y-lev
 
 ```
 .
-├── client/                 React app
+├── client/                 React app (Vite + Monaco + Yjs)
 │   └── src/
 │       ├── components/      NameModal, TopBar, Sidebar, EditorPane, OutputPanel,
 │       │                    Chat, BottomPanel, SettingsMenu, ConnectionBadge, Toaster
@@ -72,8 +73,12 @@ No database — room state lives in memory. Optional disk persistence via `y-lev
 │       ├── theme/           ThemeProvider
 │       ├── App.tsx  main.tsx  types.ts  index.css
 ├── server/                 Express + y-websocket + Socket.IO + execute proxy
-│   └── src/                 index, yjs, socket, execute, languages
-├── package.json            root scripts (runs client + server together)
+│   └── src/                 index, yjs, socket, execute, languages, types.d.ts
+├── Dockerfile              Multi-stage Dockerfile for deployment
+├── render.yaml             Render cloud deployment configuration
+├── DEPLOYMENT.md           Comprehensive deployment guide
+├── .env.example            Environment configuration template
+├── package.json            Root scripts (runs client + server together)
 └── README.md
 ```
 
@@ -84,7 +89,7 @@ No database — room state lives in memory. Optional disk persistence via `y-lev
 ### Prerequisites
 
 - Node.js **18+** (20+ recommended)
-- Internet access from the server to `https://emkc.org` (for the Run feature)
+- Internet access from the server to `https://ce.judge0.com` (for code execution)
 
 ### Install
 
@@ -95,9 +100,6 @@ npm run install:all
 ```
 
 This installs the root tooling and both workspaces (`client` and `server`).
-
-> If your npm version doesn't play well with workspaces, install each app directly:
-> `npm install --prefix server && npm install --prefix client`.
 
 ### Run (development)
 
@@ -112,7 +114,7 @@ This starts **both**:
   `/yjs` to the server).
 
 Open http://localhost:5173, click **Create a room**, enter a name, and share the invite
-link (top bar 🔗) with a second tab/browser to collaborate.
+link with another browser tab to collaborate.
 
 ### Build & run (production)
 
@@ -121,8 +123,7 @@ npm run build     # builds server (tsc) and client (vite)
 npm start         # runs the compiled server on PORT (default 3001)
 ```
 
-Serve the built client (`client/dist`) with any static host and point it at the server,
-or extend the server to serve the static build.
+In production, the Express server automatically serves the compiled frontend bundle from `client/dist`, so a single port handles the UI, WebSockets, and Execution API.
 
 ### Test
 
@@ -136,13 +137,16 @@ npm test          # runs client unit tests (Vitest): validateName + theme
 
 Server (`server/`):
 
-| Var             | Default                            | Description                              |
-| --------------- | ---------------------------------- | ---------------------------------------- |
-| `PORT`          | `3001`                             | HTTP/WS port                             |
-| `CLIENT_ORIGIN` | `*`                                | CORS origin for the client              |
-| `PISTON_URL`    | `https://emkc.org/api/v2/piston`   | Execution upstream                       |
-| `PERSIST`       | *(unset)*                          | `1` to enable `y-leveldb` persistence    |
-| `LEVELDB_DIR`   | `./.leveldb`                       | Persistence directory when `PERSIST=1`   |
+| Var                  | Default                        | Description                                          |
+| -------------------- | ------------------------------ | ---------------------------------------------------- |
+| `PORT`               | `3001`                         | HTTP / WebSocket server port                         |
+| `CLIENT_ORIGIN`      | `*`                            | CORS origin for the client                           |
+| `EXECUTION_PROVIDER` | `judge0`                       | Execution engine (`judge0` or `piston`)              |
+| `JUDGE0_URL`         | `https://ce.judge0.com`        | Judge0 API endpoint URL                              |
+| `JUDGE0_API_KEY`     | *(empty)*                      | Optional API Key for RapidAPI or self-hosted Judge0  |
+| `PISTON_URL`         | `https://emkc.org/api/v2/piston`| Piston API endpoint (used if `EXECUTION_PROVIDER=piston`)|
+| `PERSIST`            | *(unset)*                      | Set to `1` to enable `y-leveldb` document persistence|
+| `LEVELDB_DIR`        | `./.leveldb`                   | Directory for LevelDB persistence                    |
 
 ---
 
@@ -156,15 +160,12 @@ Server (`server/`):
   and survive reconnects.
 - **Chat, join/leave, name checks, shared output** use **Socket.IO** rooms on the same
   HTTP server.
-- **Running code** posts to `/api/execute`, which maps the language to a Piston runtime,
-  calls Piston with a 10s timeout, and returns a normalized
+- **Running code** posts to `/api/execute`, which maps the language to a Judge0 runtime ID (or Piston runtime),
+  calls the execution service with a 10s timeout, and returns a normalized
   `{ stdout, stderr, code, time, error? }`.
 
-## Notes / limitations
+---
 
-- The **Run** feature needs outbound network access to the Piston API from the server.
-  In a locked-down/offline environment it will return a timeout/proxy error (handled
-  gracefully in the UI), but editing/collaboration still work.
-- Room state is in memory by default; restart the server to clear it (or enable
-  `PERSIST=1` to keep documents on disk).
-```
+## Deployment
+
+For full deployment instructions on **Render**, **Railway**, **Docker**, or a **VPS**, see [DEPLOYMENT.md](file:///c:/Users/hp/Desktop/projects/collaborativeeditor/CodeEditor/DEPLOYMENT.md).
