@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+/* Smooth theme transition for background/colors across the app. */
+* {
+  transition-property: background-color, border-color;
+  transition-duration: 150ms;
+}
+
+/* Remote cursor labels injected by y-monaco (yRemoteSelection / yRemoteSelectionHead).
+   y-monaco adds inline styles for the per-user color; these rules add the name label
+   look-and-feel. The caret color comes from the inline style y-monaco sets. */
+.yRemoteSelection {
+  opacity: 0.4;
+}
+.yRemoteSelectionHead {
+  position: absolute;
+  border-left: 2px solid;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  height: 100%;
+  box-sizing: border-box;
+}
+.yRemoteSelectionHead::after {
+  position: absolute;
+  content: attr(data-name);
+  transform: translateY(-100%);
+  padding: 1px 4px;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: #fff;
+  border-radius: 3px 3px 3px 0;
+  background-color: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

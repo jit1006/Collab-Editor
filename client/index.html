@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CollabCode — Real-time collaborative editor</title>
+    <!--
+      No-flash theme bootstrap. Runs synchronously before React paints so the correct
+      theme (dark/light) is applied immediately, avoiding a flash of the wrong theme.
+      Reads the same localStorage key the React ThemeProvider uses.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("theme");
+          var system = window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+          var theme = stored === "light" || stored === "dark" ? stored : system;
+          var root = document.documentElement;
+          if (theme === "dark") root.classList.add("dark");
+          else root.classList.remove("dark");
+          root.style.colorScheme = theme;
+        } catch (e) {
+          /* localStorage may be unavailable; default to light */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+/// <reference types="vitest/config" />
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+// Dev server proxies API + socket + yjs ws to the backend on :3001 so the client can
+// use same-origin relative URLs in development.
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": "http://localhost:3001",
+      "/socket.io": { target: "http://localhost:3001", ws: true },
+      "/yjs": { target: "ws://localhost:3001", ws: true },
+    },
+  },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+  },
+});

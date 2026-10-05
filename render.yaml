@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: realtime-collab-editor
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: EXECUTION_PROVIDER
+        value: judge0
+      - key: JUDGE0_URL
+        value: https://ce.judge0.com

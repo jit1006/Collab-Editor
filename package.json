@@ -1,0 +1,21 @@
+{
+  "name": "realtime-collab-editor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Real-time collaborative code editor (React + Yjs + Monaco + Express/Socket.IO + Piston)",
+  "license": "MIT",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently -n server,client -c green,cyan \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "start": "npm run start --prefix server",
+    "test": "npm run test --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
